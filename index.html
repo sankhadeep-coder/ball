@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Big Brain Cricket Meme Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            touch-action: none;
+            /* Prevent scroll on touch */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            /* Let clicks pass through to UI elements */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .interactive-ui {
+            pointer-events: auto;
+            /* Re-enable clicks for buttons */
+        }
+
+        /* Hilarious floating animation for menu */
+        @keyframes float {
+            0% {
+                transform: translateY(0px) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(-20px) rotate(5deg);
+            }
+
+            100% {
+                transform: translateY(0px) rotate(0deg);
+            }
+        }
+
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .meme-text-shadow {
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0px 4px 10px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+
+        <div id="scoreDisplay" class="absolute top-4 left-6 text-white text-4xl font-bold meme-text-shadow hidden">
+            Score: <span id="scoreVal">0</span>
+        </div>
+
+        <div id="mainMenu"
+            class="interactive-ui flex flex-col items-center bg-white/90 p-8 rounded-3xl shadow-2xl border-4 border-yellow-400 max-w-md w-11/12 text-center transform transition-transform">
+            <h1 class="text-5xl font-black text-yellow-500 mb-2 drop-shadow-md">BIG BRAIN</h1>
+            <h2 class="text-3xl font-bold text-red-500 mb-6 drop-shadow-md">CRICKET</h2>
+
+            <p class="text-gray-700 mb-2 font-semibold">Keep the head bouncing! Don't let the big brain drop!</p>
+
+            <p class="text-red-600 mb-6 font-bold text-sm bg-red-100 p-2 rounded-lg border border-red-200">
+                If you score more than <span class="bg-yellow-400 text-gray-900 px-1.5 rounded shadow-sm">30</span> the
+                <span class="bg-yellow-400 text-gray-900 px-1.5 rounded shadow-sm">tall guy</span> will give u momo
+                party 🥟!
+            </p>
+
+            <div class="mb-6 w-full">
+                <input type="text" id="playerNameInput" placeholder="Enter Player Name"
+                    class="block w-full text-xl px-4 py-3 rounded-xl border-4 border-yellow-400 focus:outline-none focus:border-green-500 shadow-inner text-center font-bold text-gray-800 transition-colors"
+                    autocomplete="off" />
+            </div>
+
+            <div id="imageFallback"
+                class="hidden mb-6 p-4 bg-gray-100 rounded-xl border-2 border-dashed border-red-400 w-full text-center">
+                <p class="text-sm text-red-600 mb-2 font-bold">Auto-load blocked in preview. Please select the image
+                    manually:</p>
+                <input type="file" id="manualImageUpload" accept="image/*"
+                    class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 file:text-yellow-700 hover:file:bg-yellow-100 cursor-pointer" />
+            </div>
+
+            <button id="startBtn"
+                class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-10 rounded-full text-2xl shadow-[0_9px_0_rgb(21,128,61)] active:shadow-[0_0px_0_rgb(21,128,61)] active:translate-y-[9px] transition-all w-full">
+                PLAY NOW!
+            </button>
+        </div>
+
+        <div id="gameOverScreen"
+            class="interactive-ui hidden flex-col items-center bg-white/95 p-8 rounded-3xl shadow-2xl border-4 border-red-500 max-w-md w-11/12 text-center">
+            <h1 class="text-5xl font-black text-red-600 mb-2 meme-text-shadow text-white float-anim">FAAAH!</h1>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">You dropped the brain!</h2>
+            <p class="text-xl mb-6">Final Score: <span id="finalScore"
+                    class="font-black text-yellow-500 text-3xl">0</span></p>
+
+            <button id="restartBtn"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-10 rounded-full text-2xl shadow-[0_9px_0_rgb(29,78,216)] active:shadow-[0_0px_0_rgb(29,78,216)] active:translate-y-[9px] transition-all w-full">
+                PLAY AGAIN
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const mainMenu = document.getElementById('mainMenu');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const scoreVal = document.getElementById('scoreVal');
+        const finalScore = document.getElementById('finalScore');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const imageFallback = document.getElementById('imageFallback');
+        const manualImageUpload = document.getElementById('manualImageUpload');
+        const playerNameInput = document.getElementById('playerNameInput');
+
+        // Audio Setup
+        const bgMusic = new Audio('chand.mp3');
+        bgMusic.loop = true;
+
+        const gameOverMusic = new Audio('lala.mp3');
+        // You can uncomment the next line if you want the game over music to loop too
+        // gameOverMusic.loop = true;
+
+        // Game State
+        let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+        let score = 0;
+        let shakeTime = 0;
+        let currentPlayerName = '';
+
+        // User Image Logic
+        let customImage = new Image();
+        let hasCustomImage = false;
+
+        customImage.src = 'abc.png';
+
+        customImage.onload = function () {
+            hasCustomImage = true;
+            if (imageFallback) imageFallback.classList.add('hidden');
+        };
+        customImage.onerror = function () {
+            hasCustomImage = false;
+            if (imageFallback) imageFallback.classList.remove('hidden');
+        };
+
+        manualImageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    customImage.src = event.target.result;
+                    hasCustomImage = true;
+                    imageFallback.classList.add('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Meme Phrases
+        const phrases = [
+            "Mega Mind", "BALD POWER", "Chrome Dome", "Solar Panel",
+            "Egg Head", "Shine Bright", "Cue Ball", "Moon Landing",
+            "Smooth Criminal", "Tic Tac", "Bald Eagle", "Head Glare",
+            "Skin Cap", "Bowling Ball", "Mr. Clean", "Wax Museum",
+            "Knee Head", "No Signal", "Bald Fraud", "Sunset Reflector",
+            "Slippery Summit", "Thumb Head", "Naked Skull", "Aerodynamic King",
+            "Polished Rock", "Lightbulb Head", "Rolling Stone", "Bald Bhature",
+            "Shiny Potato", "Fresh Waxed"
+        ];
+        let floatingTexts = [];
+
+        // Game Entities
+        let head = {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            radius: 50,
+            rotation: 0,
+            angularVelocity: 0
+        };
+
+        let bat = {
+            x: 0,
+            y: 0,
+            width: 120,
+            height: 25,
+            targetX: 0,
+            targetY: 0
+        };
+
+        // Physics variables - initialized low for a slow start
+        let baseGravity = 0.15;
+        const bounciness = 0.8;
+
+        // Resize Canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if (gameState === 'MENU') {
+                bat.targetX = canvas.width / 2 - bat.width / 2;
+                bat.targetY = canvas.height - 100;
+                bat.x = bat.targetX;
+                bat.y = bat.targetY;
+            }
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Input handling (Mouse & Touch)
+        function handleMove(x, y) {
+            if (gameState === 'PLAYING') {
+                bat.targetX = x - bat.width / 2;
+                bat.targetY = y;
+            }
+        }
+
+        window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+        window.addEventListener('touchmove', (e) => {
+            if (gameState === 'PLAYING') e.preventDefault(); // prevent scroll
+            handleMove(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        // Start / Restart Game
+        function startGame() {
+            // Get player name
+            currentPlayerName = playerNameInput.value.trim().toLowerCase();
+
+            gameState = 'PLAYING';
+            score = 0;
+            scoreVal.innerText = score;
+            floatingTexts = [];
+
+            // Reset head position with very slow initial speed
+            head.x = canvas.width / 2;
+            head.y = -100;
+            head.vx = (Math.random() - 0.5) * 2; // slow drift
+            head.vy = 1; // extremely slow initial drop
+            head.rotation = 0;
+            head.angularVelocity = 0;
+
+            // Stop Game Over Music
+            gameOverMusic.pause();
+            gameOverMusic.currentTime = 0;
+
+            // Start Audio
+            bgMusic.currentTime = 0; // reset to beginning if restarting
+            bgMusic.play().catch(e => console.log("Audio play failed:", e));
+
+            // UI
+            mainMenu.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            gameOverScreen.classList.remove('flex');
+            scoreDisplay.classList.remove('hidden');
+            canvas.style.cursor = 'none'; // hide cursor during gameplay
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            finalScore.innerText = score;
+            gameOverScreen.classList.remove('hidden');
+            gameOverScreen.classList.add('flex');
+            scoreDisplay.classList.add('hidden');
+            canvas.style.cursor = 'auto';
+
+            // Stop Background Music
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+
+            // Play Game Over Music
+            gameOverMusic.currentTime = 0;
+            gameOverMusic.play().catch(e => console.log("Audio play failed:", e));
+        }
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        // Spawn Meme Text
+        function spawnText(x, y) {
+            // Sankhadeep gets special phrases during God Mode
+            let currentPhrases = phrases;
+            if (currentPlayerName === 'sankhadeep' && score < 50) {
+                currentPhrases = ["GOD MODE!", "TOO EASY!", "AUTO-AIM", "RELAX...", "CHILL", "INVINCIBLE!"];
+            }
+
+            const phrase = currentPhrases[Math.floor(Math.random() * currentPhrases.length)];
+            const colors = ['#FFD700', '#00FF00', '#FF00FF', '#00FFFF', '#FF4500'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            floatingTexts.push({
+                x: x,
+                y: y,
+                text: phrase,
+                life: 1.0,
+                color: color,
+                dy: -2 - Math.random() * 2,
+                dx: (Math.random() - 0.5) * 2
+            });
+        }
+
+        // Background drawing (Lab easter egg)
+        function drawBackground() {
+            // Wall
+            ctx.fillStyle = '#f0f4f8';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Door
+            ctx.fillStyle = '#d2a679';
+            ctx.fillRect(50, 150, 180, canvas.height);
+            ctx.strokeStyle = '#8a5c45';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(50, 150, 180, canvas.height);
+            ctx.strokeRect(140, 150, 0, canvas.height); // middle line
+
+            // Handle
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(125, canvas.height / 2, 10, 30);
+            ctx.fillRect(145, canvas.height / 2, 10, 30);
+
+            // Easter Egg Signs!
+            ctx.save();
+            ctx.fillStyle = '#e6e6e6';
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+
+            // Sign 1
+            ctx.fillRect(60, 50, 250, 80);
+            ctx.strokeStyle = '#aaa';
+            ctx.strokeRect(62, 52, 246, 76);
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.textAlign = 'center';
+            ctx.fillText("LAB M.Sc. SYNTHESIS", 185, 80);
+            ctx.fillText("LAB 8", 185, 110);
+
+            // Sign 2
+            ctx.fillStyle = '#e6e6e6';
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.fillRect(canvas.width - 300, 100, 250, 70);
+            ctx.strokeStyle = '#aaa';
+            ctx.strokeRect(canvas.width - 298, 102, 246, 66);
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.fillText("MOLECULAR MATERIAL", canvas.width - 175, 130);
+            ctx.fillText("LAB", canvas.width - 175, 155);
+
+            ctx.restore();
+        }
+
+        // Game Loop Update
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            let isSankhadeep = (currentPlayerName === 'sankhadeep');
+            let sankhadeepGodMode = (isSankhadeep && score < 50);
+
+            // Smooth bat movement for humans
+            bat.x += (bat.targetX - bat.x) * 0.3;
+            bat.y += (bat.targetY - bat.y) * 0.3;
+
+            // Constrain bat to screen
+            if (bat.x < 0) bat.x = 0;
+            if (bat.x + bat.width > canvas.width) bat.x = canvas.width - bat.width;
+
+            // Apply Gravity and Speed
+            let currentGravity = 0.15;
+            let currentTerminalVelocity = 25;
+
+            if (sankhadeepGodMode) {
+                // Relaxing, easy physics
+                currentGravity = 0.15;
+                currentTerminalVelocity = 15;
+            } else {
+                // Normal scaling or Post-50 Sankhadeep Sudden Death
+                if (score > 25 || (isSankhadeep && score >= 50)) {
+                    currentGravity = 3.5; // Toughest game in human history
+                    currentTerminalVelocity = 120;
+                } else if (score > 20) {
+                    currentGravity = 1.5; // Uncontrollably fast
+                    currentTerminalVelocity = 60;
+                } else if (score > 10) {
+                    currentGravity = 0.6 + (score - 10) * 0.08; // Very very fast
+                    currentTerminalVelocity = 40;
+                } else {
+                    currentGravity = baseGravity + (score * 0.03); // Slow start
+                    currentTerminalVelocity = 25;
+                }
+            }
+
+            head.vy += currentGravity;
+            if (head.vy > currentTerminalVelocity) head.vy = currentTerminalVelocity;
+
+            // Stealth God Mode: Secretly alter ball physics to naturally curve towards the bat
+            if (sankhadeepGodMode && head.vy > 0) {
+                let batCenter = bat.x + bat.width / 2;
+                let diff = batCenter - head.x;
+                // Gentle magnetic pull horizontally towards the player's bat
+                head.vx += diff * 0.03;
+                // Cap the horizontal curve speed to look like natural wind/spin
+                if (head.vx > 12) head.vx = 12;
+                if (head.vx < -12) head.vx = -12;
+            }
+
+            head.x += head.vx;
+            head.y += head.vy;
+            head.rotation += head.angularVelocity;
+
+            // Wall bounces (Left & Right)
+            if (head.x - head.radius < 0) {
+                head.x = head.radius;
+                head.vx *= -0.8;
+                head.angularVelocity = head.vy * 0.05; // Spin on wall hit
+            } else if (head.x + head.radius > canvas.width) {
+                head.x = canvas.width - head.radius;
+                head.vx *= -0.8;
+                head.angularVelocity = -head.vy * 0.05;
+            }
+
+            // Ceiling bounce
+            if (head.y - head.radius < 0 && head.vy < 0) {
+                head.y = head.radius;
+                head.vy *= -0.5;
+            }
+
+            // Collision with Bat (The Core Mechanic!)
+            let closestX = Math.max(bat.x, Math.min(head.x, bat.x + bat.width));
+            let closestY = Math.max(bat.y, Math.min(head.y, bat.y + bat.height));
+
+            let distanceX = head.x - closestX;
+            let distanceY = head.y - closestY;
+            let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+
+            let isHit = false;
+
+            // Check normal collision
+            if (distanceSquared < (head.radius * head.radius) && head.vy > 0) {
+                isHit = true;
+            }
+            // Emergency Stealth Save: if they swiped away at the very last frame, catch it anyway!
+            else if (sankhadeepGodMode && head.y + head.radius >= bat.y && head.y - head.radius <= bat.y + bat.height && head.vy > 0) {
+                isHit = true;
+                bat.x = head.x - bat.width / 2; // Insane flick-shot illusion snap
+            }
+
+            if (isHit) {
+
+                // BOUNCE!
+                head.y = bat.y - head.radius; // pop out of bat
+
+                let hitRatio = (head.x - (bat.x + bat.width / 2)) / (bat.width / 2);
+
+                let baseBounce = 8;
+                let horizontalSpeed = 8;
+
+                if (sankhadeepGodMode) {
+                    baseBounce = 12; // Nice consistent bounce
+                    horizontalSpeed = 5;
+                } else {
+                    if (score > 25 || (isSankhadeep && score >= 50)) {
+                        baseBounce = 50; // Impossible bounce
+                        horizontalSpeed = 45;
+                    } else if (score > 20) {
+                        baseBounce = 32; // Uncontrollable bounce
+                        horizontalSpeed = 28;
+                    } else if (score > 10) {
+                        baseBounce = 18 + (score - 10) * 1.2; // Very fast bounce
+                        horizontalSpeed = 16 + (score - 10) * 0.8;
+                    } else {
+                        baseBounce = 8 + (score * 0.5); // Slow bounce start
+                        horizontalSpeed = 8 + (score * 0.4);
+                    }
+                }
+
+                head.vy = -baseBounce - Math.random() * 2;
+                head.vx = hitRatio * horizontalSpeed;
+
+                // Add spin
+                if (sankhadeepGodMode) {
+                    head.angularVelocity = hitRatio * 0.1; // Gentle spin
+                } else {
+                    head.angularVelocity = hitRatio * (score > 20 ? 1.5 : 0.5);
+                }
+
+                // Score!
+                score++;
+                scoreVal.innerText = score;
+
+                shakeTime = sankhadeepGodMode ? 2 : 10; // Less screen shake in god mode
+
+                spawnText(head.x, head.y);
+            }
+
+            // Game Over Check
+            if (head.y - head.radius > canvas.height) {
+                // Safety net: Just in case God Mode glitches due to framerate, force a bounce!
+                if (sankhadeepGodMode) {
+                    head.y = canvas.height - head.radius - 50;
+                    head.vy = -15;
+                    score++;
+                    scoreVal.innerText = score;
+                    spawnText(head.x, head.y);
+                } else {
+                    gameOver();
+                }
+            }
+
+            // Update floating texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let t = floatingTexts[i];
+                t.y += t.dy;
+                t.x += t.dx;
+                t.life -= 0.02;
+                if (t.life <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+        }
+
+        // Draw Everything
+        function draw() {
+            // Apply screen shake
+            ctx.save();
+            if (shakeTime > 0) {
+                let dx = (Math.random() - 0.5) * 10;
+                let dy = (Math.random() - 0.5) * 10;
+                ctx.translate(dx, dy);
+                shakeTime--;
+            }
+
+            drawBackground();
+
+            if (gameState === 'PLAYING') {
+                // Draw Bat (Cricket Bat shape)
+                ctx.save();
+                ctx.translate(bat.x, bat.y);
+
+                // Handle
+                ctx.fillStyle = '#444';
+                ctx.fillRect(bat.width / 2 - 8, -30, 16, 30);
+                // Blade
+                ctx.fillStyle = '#e6c280'; // wood
+                ctx.beginPath();
+                ctx.roundRect(0, 0, bat.width, bat.height, 5);
+                ctx.fill();
+                ctx.strokeStyle = '#c29a53';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // Bat grip rings
+                ctx.fillStyle = '#f00';
+                ctx.fillRect(bat.width / 2 - 8, -25, 16, 5);
+                ctx.fillRect(bat.width / 2 - 8, -15, 16, 5);
+
+                ctx.restore();
+            }
+
+            // Draw Head
+            if (gameState !== 'MENU' || head.y > -100) {
+                ctx.save();
+                ctx.translate(head.x, head.y);
+                ctx.rotate(head.rotation);
+
+                if (hasCustomImage) {
+                    // Draw user uploaded image circularly cropped
+                    ctx.beginPath();
+                    ctx.arc(0, 0, head.radius, 0, Math.PI * 2);
+                    ctx.closePath();
+                    ctx.clip(); // This clip removes the background!
+                    // Assumes a roughly square image, centers it
+                    ctx.drawImage(customImage, -head.radius, -head.radius, head.radius * 2, head.radius * 2);
+                } else {
+                    // Fallback face if image fails to load
+                    ctx.beginPath();
+                    ctx.arc(0, 0, head.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#b37759';
+                    ctx.fill();
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 40px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText("?", 0, 0);
+                }
+
+                ctx.restore();
+            }
+
+            // Draw Floating Texts
+            for (let t of floatingTexts) {
+                ctx.save();
+                ctx.globalAlpha = t.life;
+                ctx.font = 'bold 30px "Comic Sans MS", Impact, sans-serif';
+                ctx.fillStyle = t.color;
+                ctx.textAlign = 'center';
+
+                // Text stroke for visibility
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 4;
+                ctx.strokeText(t.text, t.x, t.y);
+                ctx.fillText(t.text, t.x, t.y);
+                ctx.restore();
+            }
+
+            ctx.restore(); // Restore screen shake translation
+        }
+
+        // Main Loop
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Start animation
+        loop();
+
+    </script>
+</body>
+
+</html>
